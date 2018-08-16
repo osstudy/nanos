@@ -40,11 +40,11 @@ void fail(status s)
 
 
 // could be a different stack
-CLOSURE_4_1(kernel_read_complete, void, heap, heap, u64, u32, buffer);
-void kernel_read_complete(heap physical, heap working, u64 stack, u32 stacklen, buffer kb)
+CLOSURE_4_1(kernel_read_complete, void, heap, heap, u64, u32, value);
+void kernel_read_complete(heap physical, heap working, u64 stack, u32 stacklen, value kb)
 {
     console("kernel complete\n");
-    u32 *e = (u32 *)kb->contents;
+    u32 *e = (u32 *)((buffer)kb)->contents;
 
     // should be the intersection of the empty physical and virtual
     // up to some limit, 2M aligned
@@ -108,13 +108,10 @@ u32 filesystem_base()
 }
 
 
-static CLOSURE_4_2 (filesystem_initialized, void, heap, heap, tuple, buffer_handler, filesystem, status);
-static void filesystem_initialized(heap h, heap physical, tuple root, buffer_handler complete, filesystem fs, status s)
+static CLOSURE_1_1 (filesystem_initialized, void, value_handler, value);
+static void filesystem_initialized(value_handler complete, value root)
 {
-    filesystem_read_entire(fs, lookup(root, sym(kernel)),
-                           physical,
-                           complete, 
-                           closure(h, fail));
+    get(lookup(root, sym(kernel)), sym(contents), complete);
 }
 
                             
@@ -122,15 +119,13 @@ void newstack(heap h, heap physical, u64 stack, u32 stacklength)
 {
     u32 fsb = filesystem_base();
     tuple root = allocate_tuple();
-    buffer_handler bh = closure(h, kernel_read_complete, physical, h, stack, stacklength);
-    console("create fs\n");
+    value_handler bh = closure(h, kernel_read_complete, physical, h, stack, stacklength);
     create_filesystem(h,
                       512,
                       2*1024*1024, // fix,
                       closure(h, stage2_read_disk, fsb),
                       closure(h, stage2_empty_write),
-                      root,
-                      closure(h, filesystem_initialized, h, physical, root, bh));
+                      closure(h, filesystem_initialized, bh));
     
     halt("kernel failed to execute\n");
 }
@@ -144,15 +139,15 @@ void centry()
     workings.alloc = stage2_allocator;
     init_runtime(&workings);
     void *x = allocate(&workings, 10);
-    u32 fsb = filesystem_base();
 
+    // set up 32 bit cpu for SSE -- xxx look up these bits and define them
     u32 cr0, cr4;
     mov_from_cr("cr0", cr0);
     mov_from_cr("cr4", cr4);
     cr0 &= ~(1<<2); // clear EM
-    cr0 |= 1<<1; // set MP EM
-    cr4 |= 1<<9; // set osfxsr
-    cr0 |= 1<<10; // set osxmmexcpt
+    cr0 |= 1<<1;    // set MP EM
+    cr4 |= 1<<9;    // set osfxsr
+    cr0 |= 1<<10;   // set osxmmexcpt
     mov_to_cr("cr0", cr0);
     mov_to_cr("cr4", cr4);    
 
@@ -162,7 +157,7 @@ void centry()
         // range intersect free memory with bios
         u32 b = region_base(r);        
         if (region_type(r) == REGION_PHYSICAL) {
-            if (b == 0) region_base(r) = pad (0x7c00 + fsb, PAGESIZE);
+            if (b == 0) region_base(r) = pad (0x7c00 + filesystem_base(), PAGESIZE);
             region_length(r) -= region_base(r) - b;
         }
     }

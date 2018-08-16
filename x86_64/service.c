@@ -16,8 +16,7 @@ void startup(heap pages,
              heap general,
              heap physical,
              heap virtual,
-             tuple root,
-             filesystem fs);
+             tuple root);
 
 // xxx -this is handing out a page per object
 heap allocate_tagged_region(heap h, u64 tag)
@@ -81,12 +80,12 @@ static void offset_block_read(block_read r, u64 start, void *dest, u64 length, u
 
 void init_extra_prints(); 
 
-CLOSURE_6_0(startup, void, heap, heap, heap, heap, tuple, filesystem);
+CLOSURE_5_0(startup, void, heap, heap, heap, heap, tuple);
 
-static CLOSURE_3_2(fsstarted, void, heap, heap, tuple, filesystem, status);
-static void fsstarted(heap h, heap virtual, tuple root, filesystem fs, status s)
+static CLOSURE_2_1(fsstarted, void, heap, heap, value);
+static void fsstarted(heap h, heap virtual, value root)
 {
-    enqueue(runqueue, closure(h, startup, pages, h, physical_memory, virtual, root, fs));
+    enqueue(runqueue, closure(h, startup, pages, h, physical_memory, virtual, root));
 }
 
 CLOSURE_3_3(attach_storage, void, heap, heap, tuple, block_read, block_write, u64);
@@ -107,8 +106,7 @@ void attach_storage(heap h, heap virtual, tuple root, block_read r, block_write 
                       length,
                       closure(h, offset_block_read, r, fs_offset),
                       closure(h, offset_block_write, w, fs_offset),
-                      root,
-                      closure(h, fsstarted, h, virtual, root));
+                      closure(h, fsstarted, h, virtual));
 
     runloop();
 }

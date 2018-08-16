@@ -5,17 +5,18 @@
 
 #define ppush(__s, __b, __f, ...) ({buffer_clear(__b);\
             bprintf(b, __f, __VA_ARGS__);                               \
-            u64 len = pad(buffer_length(b), 64)>>6;                     \
+            u64 len = pad((buffer_length(b)+1), 8)>>3;                  \
+            push_u8(b, 0);\
             __s -= len;                                                 \
             runtime_memcpy(s, buffer_ref(b, 0), buffer_length(b));\
             (char *)__s;})
 
 static void build_exec_stack(heap sh, thread t, Elf64_Ehdr * e, void *start, u64 va, tuple process_root)
 {
-    rprintf ("build exec stack %p %v\n", process_root, transient);
     buffer b = allocate_buffer(transient, 128);
     vector arguments = tuple_vector(transient, table_find(process_root, sym(arguments)));
     tuple environment = table_find(process_root, sym(environment));
+    
     u64 stack_size = 2*MB;
     u64 pointer = stack_size;
     u64 *s = allocate(sh, stack_size);
@@ -32,13 +33,13 @@ static void build_exec_stack(heap sh, thread t, Elf64_Ehdr * e, void *start, u64
         {AT_ENTRY, u64_from_pointer(start)}};
     
     int auxplen = sizeof(auxp)/(2*sizeof(u64));
-    int argc = vector_length(arguments);    
+    int argc = 0;
     char **argv = alloca(argc * sizeof(u64));
     int envc = table_elements(environment);
     char **envp = alloca(envc * sizeof(u64));
     buffer a;
-    vector_foreach(arguments, a)  argv[argc++] = ppush(s, b, "%b\0", a);
-    table_foreach(environment, n, v)  envp[envc++] = ppush(s, b, "%b=%b\0", symbol_string(n), v);
+    vector_foreach(arguments, a)  argv[argc++] = ppush(s, b, "%b", a);
+    table_foreach(environment, n, v)  envp[envc++] = ppush(s, b, "%b=%b", symbol_string(n), v);
     spush(s, 0);
     spush(s, 0);
     
@@ -61,9 +62,9 @@ void start_process(thread t, void *start)
     
     // move outside?
 #if NET && GDB
-    if (resolve_cstring(fs, "gdb")) {
-        console ("gdb!\n");
-        init_tcp_gdb(general, p, 1234);
+    if (table_find(t->p->root, sym(gdb))) {
+        console ("starting gdb\n");
+        init_tcp_gdb(t->p->h, t->p, 1234);
     } else
 #endif
     {
@@ -72,19 +73,13 @@ void start_process(thread t, void *start)
     }
 }
 
-static CLOSURE_0_1(load_interp_fail, void, status);
-static void load_interp_fail(status s)
-{
-    console("interp fail\n");
-    halt("read interp failed %v\n", s);
-}
 
-
-CLOSURE_4_1(load_interp_complete, void, thread, heap, heap, heap, buffer);
-void load_interp_complete(thread t, heap virtual, heap pages, heap physical, buffer b)
+CLOSURE_4_1(load_interp_complete, void, thread, heap, heap, heap, value);
+void load_interp_complete(thread t, heap virtual, heap pages, heap physical, value v)
 {
     u64 where = allocate_u64(virtual, HUGE_PAGESIZE);
-    start_process(t, load_elf(b, where, pages, physical));
+    rprintf("interp: %p\n", where);
+    start_process(t, load_elf((buffer)v, where, pages, physical));
 }
 
 
@@ -96,11 +91,10 @@ process exec_elf(buffer ex,
                  heap physical,
                  heap pages,
                  heap virtual,
-                 heap backed,
-                 filesystem fs)
+                 heap backed)
 {
     // is process md always root?
-    process proc = create_process(general, pages, physical, md, fs);
+    process proc = create_process(general, pages, physical, md);
     thread t = create_thread(proc);
     void *start = load_elf(ex, 0, pages, physical);
     u64 va;
@@ -125,9 +119,7 @@ process exec_elf(buffer ex,
             tuple interp = resolve_path(root, split(general, alloca_wrap_buffer(n, runtime_strlen(n)), '/'));
             if (!interp) 
                 halt("couldn't find program interpreter %s\n", n);
-            filesystem_read_entire(fs, interp, backed,
-                                   closure(general, load_interp_complete, t, virtual, pages, physical),
-                                   closure(general, load_interp_fail));
+            get(interp, sym(contents), closure(general, load_interp_complete, t, virtual, pages, physical));
             return proc;
         }
     }

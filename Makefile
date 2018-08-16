@@ -4,7 +4,10 @@ force:
 
 ROOT = .
 
-image: net/lwip force 
+mkfs/mkfs: force
+	cd mkfs ; make
+
+image: net/lwip force mkfs/mkfs
 	make -f image.mk image
 
 net/lwip:
@@ -18,7 +21,7 @@ clean:
 	cd stage3 ; make clean
 	cd mkfs ; make clean
 	cd examples ; make clean
-	rm -f runtime/closure_templates.h runtime/contgen image image2
+	rm -f runtime/closure_templates.h runtime/contgen image image2 fs
 
 # need to get boot and virtio storage to use the same file without
 # contending on the write lock - cant set read only

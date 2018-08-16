@@ -370,6 +370,7 @@ buffer_handler init_gdb(heap h,
     g->in = allocate_buffer(h, 256);
     g->h = h;
     g->t = vector_get(p->threads, 0);
+    rprintf ("init %p\n", g->t);
     g->t->frame[FRAME_FAULT_HANDLER] = u64_from_pointer(closure(h, gdb_handle_exception, g));
     reset_parser(g);
     return closure(h, gdbserver_input, g);

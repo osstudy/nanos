@@ -4,13 +4,12 @@ include net/Makefile
 
 force:
 
-mkfs/mkfs: force
-	cd mkfs ; make
+TARGET=hw
 
-image: boot/boot mkfs/mkfs manifest stage3/stage3 examples/web
-	mkfs/mkfs fs < manifest ; cat boot/boot fs > image
+image: boot/boot mkfs/mkfs examples/$(TARGET).manifest.local stage3/stage3 examples/$(TARGET)
+	mkfs/mkfs fs < examples/$(TARGET).manifest.local ; cat boot/boot fs > image
 
-examples/web: force
+examples/$(TARGET): force
 	cd examples ; make
 
 boot/boot: force

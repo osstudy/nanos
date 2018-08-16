@@ -3,6 +3,8 @@
 #include <system_structs.h>
 #include <tfs.h>
 #include <unix.h>
+#include <gdb.h>
+#include <net.h>
 
 // fix
 #define FDS 64
@@ -10,7 +12,7 @@
 typedef struct process *process;
 typedef struct thread *thread;
 
-process create_process(heap h, heap pages, heap contig, tuple root, filesystem fs);
+process create_process(heap h, heap pages, heap contig, tuple root);
 thread create_thread(process);
 void run(thread);
 
@@ -29,7 +31,7 @@ typedef struct thread {
 } *thread;
 
 
-typedef closure_type(io, int, void *, u64 length, u64 offset);
+typedef closure_type(io, int, void *, u64 length, u64 offset, status_handler completion);
 
 typedef struct file {
     u64 offset; 

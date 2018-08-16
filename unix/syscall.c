@@ -6,6 +6,7 @@ typedef struct code {
 } *code;
 
 // xxx - put in tuple space
+// static tuples
 struct code syscall_codes[]= {
     {SYS_read, "read"},
     {SYS_write, "write"},
@@ -349,19 +350,26 @@ char *syscall_name(int x)
     return ("invalidine syscall");
 }
 
+static CLOSURE_1_1(read_complete, void, thread, status);
+static void read_complete(thread t, status s)
+{
+    enqueue(runqueue, t->run);
+}
 
 int read(int fd, u8 *dest, bytes length)
 {
     file f = current->p->files[fd];
-    return apply(f->read, dest, length, f->offset);
+    apply(f->read, dest, length, f->offset, closure(current->p->h, read_complete, current));
+    runloop();
 }
 
 int write(int fd, u8 *body, bytes length)
 {
     file f = current->p->files[fd];
-    int res = apply(f->write, body, length, f->offset);
+    int res = apply(f->write, body, length, f->offset, closure(current->p->h, read_complete, current));
+    // on completoin
     f->offset += length;
-    return res;
+    runloop();
 }
 
 static int writev(int fd, iovec v, int count)
@@ -389,10 +397,10 @@ static void readcomplete(thread t, u64 len, status s)
     thread_wakeup(t);
 }
 
-static CLOSURE_1_3(contents_read, int, tuple, void *, u64, u64);
-static int contents_read(tuple n, void *dest, u64 length, u64 offset)
+static CLOSURE_1_4(contents_read, int, value, void *, u64, u64, status_handler);
+static int contents_read(value n, void *dest, u64 length, u64 offset, status_handler completion)
 {
-    filesystem_read(current->p->fs, n, dest, length, offset, closure(current->p->h, readcomplete, current, length));
+    filesystem_read(n, dest, length, offset, closure(current->p->h, readcomplete, current, length));
     runloop();
 }
 
@@ -443,6 +451,7 @@ static void fill_stat(tuple n, struct stat *s)
 
 static int fstat(int fd, struct stat *s)
 {
+    rprintf ("fstat %d\n", fd);
     // take this from tuple space
     if (fd == 1) {
         s->st_mode = S_IFIFO;

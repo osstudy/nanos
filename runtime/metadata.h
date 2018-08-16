@@ -20,7 +20,7 @@ static void contentsof(tuple n, buffer_handler bh)
         return;
         break;
     // should be gsi
-    case tag_buffer_promise:
+    case tag_tuple_handler:
         apply((buffer_promise)v, bh);
         return;        
         break;

@@ -3,8 +3,12 @@
 #define END_OF_LOG 1
 #define TUPLE_AVAILABLE 2
 #define END_OF_SEGMENT 3
+#define EXTENSION 4
 
+// the max encoding size of an extend record
 #define TRAILER_SIZE 16
+
+static void log_get(tuple_handler th, symbol n, value_handler complete);
 
 typedef struct log {
     filesystem fs;
@@ -16,6 +20,13 @@ typedef struct log {
     heap h;
 } *log;
 
+typedef struct log_entry {
+    struct tuple_handler th;
+    log tl;
+    table backing;
+    u64 id;
+} *log_entry;
+
 static CLOSURE_1_1(log_write_completion, void, vector, status);
 static void log_write_completion(vector v, status nothing)
 {
@@ -25,6 +36,7 @@ static void log_write_completion(vector v, status nothing)
 }
 
 // xxx  currently we cant take writes during the flush
+//      - just swap out staging
 
 void log_flush(log tl)
 {
@@ -41,28 +53,18 @@ void log_flush(log tl)
 }
 
 
-void log_write_eav(log tl, tuple e, symbol a, value v, thunk complete)
+void log_set(log tl, tuple t, symbol n, value v, status_handler complete)
 {
-    // out of space
+    // dictionary...root..translate back
     push_u8(tl->staging, TUPLE_AVAILABLE);
-    encode_eav(tl->staging, tl->dictionary, e, a, v);
+    encode_eav(tl->staging, tl->dictionary, t, n, v);
     vector_push(tl->completions, complete);
     // flush!
 }
 
-void log_write(log tl, tuple t, thunk complete)
-{
-    // out of space
-    push_u8(tl->staging, TUPLE_AVAILABLE);
-    // this should be incremental on root!
-    encode_tuple(tl->staging, tl->dictionary, t);
-    vector_push(tl->completions, complete);
-    // flush conditionally?
-}
 
-
-CLOSURE_2_1(log_read_complete, void, log, status_handler, status);
-void log_read_complete(log tl, status_handler sh, status s)
+CLOSURE_4_1(log_read_complete, void, log, table, decode_allocate, value_handler, status);
+void log_read_complete(log tl, table read_dictionary, decode_allocate d, value_handler sh, status s)
 {
     buffer b = tl->staging;
     u8 frame = 0;
@@ -70,30 +72,8 @@ void log_read_complete(log tl, status_handler sh, status s)
     if (s == 0) {
         // log extension - length at the beginnin and pointer at the end
         for (; frame = pop_u8(b), frame == TUPLE_AVAILABLE;) {
-            tuple t = decode_value(tl->h, tl->dictionary, b);
-            fsfile f;
-            // doesn't seem like all the incremental updates are handled here,
-            // nor the recursive case
-            table_foreach(t, k, v) {
-                if (k == sym(extents)) {
-                    if (!(f = table_find(tl->fs->extents, v))) {
-                        f = allocate_fsfile(tl->fs, t);
-                    }
-                    table_set(tl->fs->extents, v, f);
-                }
-            }
-            if ((f = table_find(tl->fs->extents, t)))  {
-                table_foreach(t, off, e) extent_update(f, off, e);
-            }
+            tuple t = decode_value(tl->h, tl->dictionary, b, d);
         }
-        
-        // not sure we should be passing the root.. anyways, splat the
-        // log root onto the given root
-        table logroot = (table)table_find(tl->dictionary, pointer_from_u64(1));
-        
-        if (logroot)
-            table_foreach (logroot, k, v) 
-                table_set(tl->fs->root, k, v);
     }
     
     apply(sh, 0);
@@ -101,15 +81,16 @@ void log_read_complete(log tl, status_handler sh, status s)
     //    if (frame != END_OF_LOG) halt("bad log tag %p\n", frame);    
 }
 
-void read_log(log tl, u64 offset, u64 size, status_handler sh)
+void read_log(log tl, u64 offset, u64 size, decode_allocate d, table read_dictionary,
+              value_handler sh)
 {
     tl->staging = allocate_buffer(tl->h, size);
     //    tl->staging->end = size;
-    status_handler tlc = closure(tl->h, log_read_complete, tl, sh);
+    status_handler tlc = closure(tl->h, log_read_complete, tl, read_dictionary, d, sh);
     apply(tl->fs->r, tl->staging->contents, tl->staging->length, 0, tlc);
 }
 
-log log_create(heap h, filesystem fs, status_handler sh)
+log log_create(heap h, filesystem fs, decode_allocate d, value_handler vh)
 {
     log tl = allocate(h, sizeof(struct log));
     tl->h = h;
@@ -118,6 +99,6 @@ log log_create(heap h, filesystem fs, status_handler sh)
     tl->completions = allocate_vector(h, 10);
     tl->dictionary = allocate_table(h, identity_key, pointer_equal);
     fs->tl = tl;
-    read_log(tl, 0, INITIAL_LOG_SIZE, sh);
+    read_log(tl, 0, INITIAL_LOG_SIZE, d, allocate_table(h, identity_key, pointer_equal), vh);
     return tl;
 }

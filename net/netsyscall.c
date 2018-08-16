@@ -94,15 +94,15 @@ static void read_complete(sock s, thread t, void *dest, u64 length)
 }
 
 
-static CLOSURE_1_3(socket_read, int, sock, void *, u64, u64);
-static int socket_read(sock s, void *dest, u64 length, u64 offset)
+static CLOSURE_1_4(socket_read, int, sock, void *, u64, u64, status_handler);
+static int socket_read(sock s, void *dest, u64 length, u64 offset, status_handler completion)
 {
     apply(s->f.check, closure(s->h, read_complete, s, current, dest, length));    
     runloop();    
 }
 
-static CLOSURE_1_3(socket_write, int, sock, void *, u64, u64);
-static int socket_write(sock s, void *source, u64 length, u64 offset)
+static CLOSURE_1_4(socket_write, int, sock, void *, u64, u64, status_handler);
+static int socket_write(sock s, void *source, u64 length, u64 offset, status_handler completion)
 {
     // error code..backpressure
     tcp_write(s->lw, source, length, TCP_WRITE_FLAG_COPY);
@@ -126,8 +126,8 @@ static int allocate_sock(process p, struct tcp_pcb *pcb)
     int fd;
     file f = allocate_fd(p, sizeof(struct sock), &fd);
     sock s = (sock)f;    
-    f->read =  closure(p->h, socket_read, s);
-    f->write =  closure(p->h, socket_write, s);
+    f->read = closure(p->h, socket_read, s);
+    f->write = closure(p->h, socket_write, s);
     s->notify = allocate_queue(p->h, 32);
     s->waiting = allocate_queue(p->h, 32);    
     f->check = closure(p->h, socket_check, s);

@@ -1,5 +1,27 @@
 #include <unix_internal.h>
 
+CLOSURE_2_1(mmap_read_complete, void, thread, u64, status);
+void mmap_read_complete(thread t, u64 where, status s)
+{
+    // maybe read zeros? seems like we should be able to find out the
+    // actual length?
+    //    if (len > msize) {
+    //  bss doesn't need to be contiguous
+    //u64 bss = pad(len, PAGESIZE) - msize;
+    //        map(where + msize, allocate_u64(p->physical, bss), bss, p->pages);
+    //        zero(pointer_from_u64(where+msize), bss);
+    //    }
+    
+    // ok, if we change pages entries we need to flush the tlb...dont need
+    // to do this every time.. there is also a per-page variant. va range
+    // tree would let us know
+    u64 x;
+    mov_from_cr("cr3", x);
+    mov_to_cr("cr3", x);
+    set_syscall_return(t, where);
+    enqueue(runqueue, t->run);
+}
+                       
 void *mremap(void *old_address, u64 old_size,  u64 new_size, int flags,  void *new_address )
 {
     // this seems poorly thought out - what if there is a backing file?
@@ -53,6 +75,7 @@ static void *mmap(void *target, u64 size, int prot, int flags, int fd, u64 offse
             where = allocate_u64(current->p->virtual, len);
     }
 
+    rprintf("map at %p %p\n", where, size);
     // make a generic zero page function
     if (flags & MAP_ANONYMOUS) {
         u64  m = allocate_u64(p->physical, len);
@@ -61,31 +84,20 @@ static void *mmap(void *target, u64 size, int prot, int flags, int fd, u64 offse
         zero(pointer_from_u64(where), len);
         return pointer_from_u64(where);
     }
-    
-    // check that fd is valid
-    file f = p->files[fd];
-    buffer b;
-    if (!(b = table_find(f->n, sym(contents)))) return pointer_from_u64(-1ull);
-        
-    u64 msize = 0;
-    u64 blen = buffer_length(b);
-    if (blen > offset) msize = pad(blen-offset, PAGESIZE);
-    if (msize > len) msize = len;
-    
-    // mutal misalignment?...discontiguous backing?
-    map(where, physical_from_virtual(buffer_ref(b, offset)), msize, p->pages);
 
-    if (len > msize) {
-        u64 bss = pad(len, PAGESIZE) - msize;
-        map(where + msize, allocate_u64(p->physical, bss), bss, p->pages);
-        zero(pointer_from_u64(where+msize), bss);
-    }
-    // ok, if we change pages entries we need to flush the tlb...dont need
-    // to do this every time.. there is also a per-page variant
-    u64 x;
-    mov_from_cr("cr3", x);
-    mov_to_cr("cr3", x);    
-    return pointer_from_u64(where);
+    // backing file case. xxx - this should be demand paged and set
+    // up to handle writes
+    file f = current->p->files[fd];
+    u64 backing = allocate_u64(p->physical, size);
+    // check fail!
+    // truncate and page pad the read?
+    // mutal misalignment?...discontiguous backing?
+    map(where, backing, size, p->pages);
+
+
+    // issue #34 - on demand page mapping - what about non-files?
+    apply(f->read, pointer_from_u64(where), size, offset, closure(p->h, mmap_read_complete, current, where));
+    runloop();
 }
 
 void register_mmap_syscalls(void **map)

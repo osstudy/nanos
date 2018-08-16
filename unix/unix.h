@@ -1,7 +1,7 @@
-void init_unix(heap, heap, heap, tuple, filesystem);
+void init_unix(heap, heap, heap, tuple);
 typedef struct process *process;
 typedef struct thread *thread;
-process create_process(heap h, heap pages, heap physical, tuple root, filesystem fs);
+process create_process(heap h, heap pages, heap physical, tuple root);
 thread create_thread(process p);
 process exec_elf(buffer ex,
                  tuple md,
@@ -10,5 +10,4 @@ process exec_elf(buffer ex,
                  heap physical,
                  heap pages,
                  heap virtual,
-                 heap backed,
-                 filesystem fs);
+                 heap backed);

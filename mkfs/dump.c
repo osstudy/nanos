@@ -29,9 +29,10 @@ static void bread(descriptor d, void *dest, u64 length, u64 offset, status_handl
 
 boolean compare_bytes(void *a, void *b, bytes len);
 
-CLOSURE_1_1(write_file, void, buffer, buffer);
-void write_file(buffer path, buffer b)
+CLOSURE_1_1(write_file, void, buffer, value);
+void write_file(buffer path, value v)
 {
+    buffer b = (value) v;
     // openat would be nicer really
     char *z = cstring(path);
     int fd = open(z, O_CREAT|O_WRONLY, 0644);
@@ -39,29 +40,25 @@ void write_file(buffer path, buffer b)
     close(fd);
 }
 
-// h just for extending path
-// isn't there an internal readdir?
-void readdir(filesystem fs, heap h, tuple w, buffer path)
-{
-    table_foreach(w, k, v) {
-        if (k == sym(children)) {
-            mkdir(cstring(path), 0777);
-            table_foreach((tuple)v, k, vc) {
-                readdir(fs, h, (tuple)vc, aprintf(h, "%b/%b", path, symbol_string((symbol)k)));
-            }
-        }
-        if (k == sym(extents))
-            filesystem_read_entire(fs, w, h, closure(h, write_file, path), (void *)ignore);
-    }
-}
 
+static CLOSURE_2_2(feach, void, heap, buffer, symbol, value);
+static void feach(heap h, buffer path, symbol k, value v)
+{
+    if (k == sym(children)) {
+        mkdir(cstring(path), 0777);
+        iterate(v, closure(h, feach, h, aprintf(h, "%b/%b", path, symbol_string((symbol)k))));
+    }
+    // shouldn't need to poke at extents
+    if (k == sym(extents))
+        get(v, sym(contents), closure(h, write_file, path));
+}
 #define SECTOR_SIZE 512
 
-static CLOSURE_3_2(fsc, void, heap, buffer, tuple, filesystem, status);
-static void fsc(heap h, buffer b, tuple root, filesystem fs, status s)
+static CLOSURE_2_1(fsc, void, heap, buffer, value);
+static void fsc(heap h, buffer target_path, value root)
 {
     rprintf ("meta: %v\n", root);
-    readdir(fs, h, root, b);
+    iterate(root, closure(h, feach, h, target_path));
 }
 
 int main(int argc, char **argv)
@@ -79,6 +76,5 @@ int main(int argc, char **argv)
                       10ull * 1024 * 1024 * 1024,
                       closure(h, bread, fd),
                       closure(h, bwrite, fd),
-                      root,
-                      closure(h, fsc, h, alloca_wrap_buffer(argv[2], runtime_strlen(argv[2])), root));
+                      closure(h, fsc, h, alloca_wrap_buffer(argv[2], runtime_strlen(argv[2]))));
 }

@@ -125,8 +125,10 @@ typedef void *value;
 #define tag_unknown (0ull)
 #define tag_symbol (1ull)
 #define tag_tuple (2ull)
-#define tag_string (3ull)
-#define tag_buffer_promise (4ull) //?
+#define tag_string (3ull) //? - i guess so we dont lean on unknown
+#define tag_tuple_handler (4ull) // consider subtags by type? or checking dynamic huge page allocations?
+                                 // would like to check subtype, and dont need N copies of vtable
+#define tag_error (5ull) // sadly for control flow integrated data multiplexed errors
 
 #include <symbol.h>
 
@@ -135,9 +137,12 @@ typedef void *value;
 #include <status.h>
 
 typedef closure_type(buffer_handler, void, buffer);
+typedef closure_type(value_handler, void, value);
 typedef closure_type(thunk, void);
 typedef closure_type(block_write, void, buffer, u64, status_handler);
 typedef closure_type(block_read, void, void *, u64, u64, status_handler);
+
+extern void halt(char *format, ...);
 
 #include <pqueue.h>
 #include <timer.h>
@@ -146,7 +151,6 @@ typedef closure_type(block_read, void, void *, u64, u64, status_handler);
 // break out platform - move into the implicit include
 #include <x86_64.h>
 
-extern void halt(char *format, ...);
 
 // should be  (parser, parser, character)
 typedef closure_type(parser, void *, character);
@@ -180,3 +184,4 @@ extern status_handler ignore_status;
 #define cstring(__b) ({buffer n = little_stack_buffer(512); push_buffer(n, __b); push_u8(n, 0); n->contents;})
 
 extern heap transient;
+

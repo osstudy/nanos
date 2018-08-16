@@ -11,10 +11,8 @@ typedef struct filesystem {
     heap storage;
     rtrie free;
     heap h;
-    int alignment;
-    table files; // maps tuple to fsfile
-    table extents; // maps extents
-    closure_type(log, void, tuple);
+    heap fh; // 4k aligned for elf
+    int alignment;  // block alignment - isn't this storage->pagesize? should be
     block_read r;
     block_write w;    
     log tl;
@@ -23,7 +21,9 @@ typedef struct filesystem {
 
 void extent_update(fsfile f, symbol foff, tuple value);
 
-log log_create(heap h, filesystem fs, status_handler sh);
+typedef struct fsfile *fsfile;
+
+log log_create(heap h, filesystem fs, decode_allocate d, value_handler sh);
 void log_write(log tl, tuple t, thunk complete);
 void log_write_eav(log tl, tuple e, symbol a, value v, thunk complete);
 
@@ -31,11 +31,21 @@ void log_write_eav(log tl, tuple e, symbol a, value v, thunk complete);
 // allocations properly - take this out of backed
 #define INITIAL_LOG_SIZE (3*KB)
 #define INITIAL_FS_SIZE (20 * MB)
-void read_log(log tl, u64 offset, u64 size, status_handler sh);
 void log_flush(log tl);
-void flush(filesystem fs, status_handler);
     
 typedef closure_type(merge, status_handler);
 typedef closure_type(buffer_status, buffer, status);
 merge allocate_merge(heap h, status_handler completion);
-fsfile allocate_fsfile(filesystem fs, tuple md);
+tuple_handler allocate_fsfile(filesystem fs, tuple md);
+void log_set(log tl, tuple t, symbol n, value v, status_handler complete);
+
+static tuple_handler thalloc(bytes size,
+                             filesystem fs,
+                             void (*set_special)(struct tuple_handler *, symbol, value, status_handler),
+                             tuple md);
+
+
+struct fsfile {
+    rtrie extents;
+    filesystem fs;
+};

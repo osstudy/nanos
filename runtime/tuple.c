@@ -1,8 +1,10 @@
 #include <runtime.h>
 
-static heap theap;
+// dictionaries should really be vectors
 
-// use runtime tags directly?
+static heap theap;
+static heap thheap;
+
 #define type_tuple 1
 #define type_buffer 0
 
@@ -19,13 +21,16 @@ static inline void srecord(table dictionary, void *x)
     table_set(dictionary, x, pointer_from_u64((u64)dictionary->count)+1);
 }
 
-
-// decode dictionary can really be a vector
-// region?
 tuple allocate_tuple()
 {
     return tag(allocate_table(theap, key_from_symbol, pointer_equal), tag_tuple);
 }
+
+tuple_handler allocate_tuple_handler(bytes size)
+{
+    return tag(allocate_table(thheap, key_from_symbol, pointer_equal), tag_tuple_handler);
+}
+
 
 // header: immediate(1)
 //         type(1)
@@ -79,10 +84,8 @@ static void push_header(buffer b, boolean imm, u8 type, u64 length)
     b->end += words;
 }
 
-// h is for buffer values, copy them out
-// would be nice to merge into a tuple dest, but it changes the loop and makes
-// it weird in the reference case
-value decode_value(heap h, tuple dictionary, buffer source)
+// h is for buffer values
+value decode_value(heap h, tuple dictionary, buffer source, decode_allocate d)
 {
     u8 type;
     boolean imm;
@@ -114,8 +117,9 @@ value decode_value(heap h, tuple dictionary, buffer source)
                 s = table_find(dictionary, pointer_from_u64(nlen));
                 if (!s) rprintf("missing decode dictionary symbol %d\n", nlen);                
             }
-            value nv = decode_value(h, dictionary, source);
-            table_set(t, s, nv);
+            value nv = decode_value(h, dictionary, source, d);
+            // merge
+            set(t, s, nv, ignore_status);
         }
         return t;
     } else {
@@ -174,7 +178,8 @@ void encode_eav(buffer dest, table dictionary, tuple e, symbol a, value v)
     encode_value(dest, dictionary, v);
 }
 
-// immediate only
+// root, set
+
 void encode_tuple(buffer dest, table dictionary, tuple t)
 {
     u64 tuple_id;
@@ -187,8 +192,9 @@ void encode_tuple(buffer dest, table dictionary, tuple t)
     }        
 }
 
-void init_tuples(heap h)
+void init_tuples(heap h, heap th)
 {
     theap = h;
+    thheap = th;
 }
 

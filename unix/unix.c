@@ -39,8 +39,8 @@ void default_fault_handler(thread t, context frame)
 }
 
 
-static CLOSURE_0_3(stdout, int, void*, u64, u64);
-static int stdout(void *d, u64 length, u64 offset)
+static CLOSURE_0_4(stdout, int, void*, u64, u64, status_handler);
+static int stdout(void *d, u64 length, u64 offset, status_handler s)
 {
     u8 *z = d;
     for (int i = 0; i< length; i++) {
@@ -61,7 +61,7 @@ static boolean futex_key_equal(void *a, void *b)
 
 static void *linux_syscalls[SYS_MAX];
 
-process create_process(heap h, heap pages, heap physical, tuple root, filesystem fs)
+process create_process(heap h, heap pages, heap physical, tuple root)
 {
     process p = allocate(h, sizeof(struct process));
     p->h = h;
@@ -73,7 +73,6 @@ process create_process(heap h, heap pages, heap physical, tuple root, filesystem
     p->pages = pages;
     p->cwd = root;
     p->root = root;
-    p->fs = fs;
     p->fdallocator = create_id_heap(h, 3, FDMAX - 3, 1);
     p->physical = physical;
     zero(p->files, sizeof(p->files));
@@ -122,11 +121,11 @@ static u64 syscall_debug()
     return res;
 }
 
-void init_unix(heap h, heap pages, heap physical, tuple root, filesystem fs)
+void init_unix(heap h, heap pages, heap physical, tuple root)
 {
     set_syscall_handler(syscall_enter);
     processes = create_id_heap(h, 1, 65535, 1);
-    process kernel = create_process(h, pages, physical, root, fs);
+    process kernel = create_process(h, pages, physical, root);
     current = create_thread(kernel);
     frame = current->frame;
     init_vdso(physical, pages);
