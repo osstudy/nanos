@@ -22,7 +22,7 @@ static buffer read_stdin(heap h)
 }
 
 // its nice that we can append a file to any existing buffer, but harsh we have to grow the buffer
-void read_file(buffer dest, buffer name, u64 *length)
+void read_file(buffer dest, buffer name)
 {
     // mode bit metadata
     struct stat st;
@@ -79,43 +79,29 @@ static void err(status s)
     rprintf ("reported error\n");
 }
 
-
-static buffer translate_contents(heap h, value v)
+static CLOSURE_2_0(defer_write, void, tuple, tuple);
+static void defer_write(tuple f, tuple body)
 {
-    if (tagof(v) == tag_tuple) {
-        value path = table_find((table)v, sym(host));
-        if (path) {
-            u64 len;
-            // seems like it wouldn't be to hard to arrange
-            // for this to avoid the staging copy
-            buffer dest = allocate_buffer(h, 1024);
-            read_file(dest, path, &len) ;
-            return dest;
-        }
-    }
-    return v;
+    value path = table_find((table)body, sym(host));
+    // tfs write file should take a reader
+    buffer dest = allocate_buffer(transient, 10);
+    read_file(dest, path);
+    set(f, sym(contents), dest, ignore_status);
+    flush(f, ignore_status);
 }
 
-// dont really like the file/tuple duality, but we need to get something running today,
-// so push all the bodies onto a worklist
-static value translate(heap h, vector worklist, value v, status_handler sh)
+static CLOSURE_3_2(translate_each, void, heap, vector, tuple, symbol, value);
+static void translate_each(heap h, vector worklist, tuple parent, symbol k, value v)
 {
-    switch(tagof(v)) {
-    case tag_tuple:
-        {
-            tuple out = allocate_tuple();
-            table_foreach((table)v, k, child) {
-                buffer b;
-                if (k == sym(contents)) {
-                    vector_push(worklist, build_vector(h, out, translate_contents(h, child)));
-                } else {
-                    table_set(out, k, translate(h, worklist, child, sh));
-                }
-            }
-            return out;
+    buffer b;
+    if (k == sym(contents)) {
+        vector_push(worklist, closure(h, defer_write,parent, v));
+    } else {
+        if (tagof(v) == tag_tuple) {
+            iterate(v, closure(h, translate_each, h, worklist, parent));
+        } else {
+            set(parent, k, v, ignore_status);
         }
-    default:
-        return v;
     }
 }
 
@@ -127,14 +113,9 @@ static void fsc(heap h, descriptor out, value root)
 {
     // root could be an error
     vector worklist = allocate_vector(h, 10);
-    tuple md = translate(h, worklist, root, closure(h, err));
-    vector i;
-    vector_foreach(worklist, i) {
-        tuple f = vector_get(i, 0);        
-        buffer c = vector_get(i, 1);
-        set(f, sym(contents), c, ignore_status);
-        flush(f, ignore_status);        
-    }
+    iterate(root, closure(h, translate_each, h, worklist, root));    
+    while (vector_length(worklist))
+        apply((thunk)vector_pop(worklist));
     close(out);
 }
 

@@ -1,4 +1,4 @@
-all: hw web hwg webg hws
+all: hw web hwg webg hws webs
 
 hwg: hwg.go
 	go build hwg.go
@@ -11,6 +11,9 @@ hws: hw.c
 
 web: web.c
 	cc web.c -g -o web
+
+webs: web.c
+	cc web.c -g -static -o webs
 
 webg: webg.go
 	go build webg.go

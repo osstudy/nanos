@@ -4,10 +4,10 @@ include net/Makefile
 
 force:
 
-TARGET=hw
+TARGET=hws
 
-image: boot/boot mkfs/mkfs examples/$(TARGET).manifest.local stage3/stage3 examples/$(TARGET)
-	mkfs/mkfs fs < examples/$(TARGET).manifest.local ; cat boot/boot fs > image
+image: boot/boot mkfs/mkfs examples/$(TARGET).manifest stage3/stage3 examples/$(TARGET)
+	mkfs/mkfs fs < examples/$(TARGET).manifest ; cat boot/boot fs > image
 
 examples/$(TARGET): force
 	cd examples ; make

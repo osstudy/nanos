@@ -79,7 +79,6 @@ static void storage_read(storage st, void *target, u64 length, u64 offset, statu
 static CLOSURE_5_3(attach, void, heap, storage_attach, heap, heap, heap, int, int, int);
 static void attach(heap general, storage_attach a, heap page_allocator, heap pages, heap virtual, int bus, int slot, int function)
 {
-
     storage s = allocate(general, sizeof(struct storage));
     s->v = attach_vtpci(general, page_allocator, bus, slot, function, 0);
     u32 len;

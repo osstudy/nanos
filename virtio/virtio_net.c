@@ -234,6 +234,7 @@ extern void lwip_init();
 static CLOSURE_2_3(init_vnet, void, heap, heap, int, int, int);
 static void init_vnet(heap general, heap page_allocator, int bus, int slot, int function)
 {
+    rprintf("networking attach\n");    
     u32 badness = VIRTIO_F_BAD_FEATURE | VIRTIO_NET_F_CSUM | VIRTIO_NET_F_GUEST_CSUM |
         VIRTIO_NET_F_GUEST_TSO4 | VIRTIO_NET_F_GUEST_TSO6 |  VIRTIO_NET_F_GUEST_ECN|
         VIRTIO_NET_F_GUEST_UFO | VIRTIO_NET_F_CTRL_VLAN | VIRTIO_NET_F_MQ;

@@ -192,6 +192,37 @@ void encode_tuple(buffer dest, table dictionary, tuple t)
     }        
 }
 
+
+typedef struct thdebug {
+    struct tuple_handler th;
+    tuple_handler parent;
+} *thdebug;
+    
+static void thdebug_set(value t, symbol n, value v, status_handler s)
+{
+    thdebug th = (thdebug)t;        
+    th->parent->set(th->parent, n, v, s);
+}
+
+static void thdebug_get(value t, symbol n, value_handler h)
+{
+    thdebug th = (thdebug)t;    
+    th->parent->get(th->parent, n, h);
+}
+
+tuple_handler thdebug_iterate(value t, iterate_each each)
+{
+    thdebug th = (thdebug)t;
+    th->parent->iterate(th->parent, each);
+}
+
+tuple_handler wrap_thdebug(heap h, tuple_handler wrap)
+{
+    
+}
+
+
+
 void init_tuples(heap h, heap th)
 {
     theap = h;
