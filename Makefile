@@ -1,4 +1,4 @@
-all: image
+all: image test
 
 force:
 
@@ -13,6 +13,9 @@ image: net/lwip force mkfs/mkfs
 net/lwip:
 	(cd $(ROOT)/net; git clone http://git.savannah.nongnu.org/git/lwip.git ; cd lwip ; git checkout STABLE-2_0_3_RELEASE)
 
+test: force
+	cd test ; make
+
 distclean: clean
 	rm -rf net/lwip
 
@@ -20,6 +23,7 @@ clean:
 	cd boot ; make clean
 	cd stage3 ; make clean
 	cd mkfs ; make clean
+	cd test ; make clean
 	cd examples ; make clean
 	rm -f runtime/closure_templates.h runtime/contgen image image2 fs
 
