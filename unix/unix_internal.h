@@ -6,9 +6,6 @@
 #include <gdb.h>
 #include <net.h>
 
-// fix
-#define FDS 64
-
 typedef struct process *process;
 typedef struct thread *thread;
 
@@ -59,8 +56,7 @@ typedef struct process {
     vector threads;
     u64 sigmask;
     void **syscall_handlers;
-    // vector - there is no reason this should be fixed
-    file files[FDS];
+    vector files;
 } *process;
 
 file allocate_fd(process p, bytes size, int *);
@@ -110,3 +106,6 @@ static inline void set_syscall_return(thread t, u64 val)
 {
     t->frame[FRAME_RAX] = val;
 }
+
+#define resolve_fd(__p, __fd) ({void *f ; if (!(f = vector_get(__p->files, __fd))) return(-EBADF); f;})
+

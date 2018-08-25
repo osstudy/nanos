@@ -33,8 +33,8 @@ void log_write_eav(log tl, tuple e, symbol a, value v, thunk complete);
 #define INITIAL_FS_SIZE (20 * MB)
 void log_flush(log tl);
     
-typedef closure_type(merge, status_handler);
 typedef closure_type(buffer_status, buffer, status);
+
 merge allocate_merge(heap h, status_handler completion);
 value allocate_fsfile(filesystem fs);
 void log_set(log tl, tuple t, symbol n, value v, status_handler complete);
@@ -57,4 +57,5 @@ tuple_handler backed_alloc(fsfile f,
                            void (*get)(fsfile f, symbol, value_handler));
 
 value tree_merge(heap h, tuple sd, tuple, status_handler complete);
+
 

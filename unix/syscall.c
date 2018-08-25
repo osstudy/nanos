@@ -358,16 +358,15 @@ static void read_complete(thread t, status s)
 
 int read(int fd, u8 *dest, bytes length)
 {
-    file f = current->p->files[fd];
+    file f = resolve_fd(current->p, fd);            
     apply(f->read, dest, length, f->offset, closure(current->p->h, read_complete, current));
     runloop();
 }
 
 int write(int fd, u8 *body, bytes length)
 {
-    file f = current->p->files[fd];
+    file f = resolve_fd(current->p, fd);                
     int res = apply(f->write, body, length, f->offset, closure(current->p->h, read_complete, current));
-    // on completoin
     f->offset += length;
     runloop();
 }
@@ -375,7 +374,7 @@ int write(int fd, u8 *body, bytes length)
 static int writev(int fd, iovec v, int count)
 {
     int res;
-    file f = current->p->files[fd];
+    file f = resolve_fd(current->p, fd);
     for (int i = 0; i < count; i++) res += write(fd, v[i].address, v[i].length);
     return res;
 }
@@ -451,13 +450,13 @@ static void fill_stat(tuple n, struct stat *s)
 
 static int fstat(int fd, struct stat *s)
 {
-    rprintf ("fstat %d\n", fd);
+    file f = resolve_fd(current->p, fd);            
     // take this from tuple space
     if (fd == 1) {
         s->st_mode = S_IFIFO;
         return 0;
     }
-    fill_stat(current->p->files[fd]->n, s);
+    fill_stat(f->n, s);
     return 0;
 }
 
@@ -475,7 +474,8 @@ static int stat(char *name, struct stat *s)
 
 static u64 lseek(int fd, u64 offset, int whence)
 {
-    return current->p->files[fd]->offset;
+    file f = resolve_fd(current->p, fd);            
+    return f->offset;
 }
 
 
@@ -496,8 +496,9 @@ int getrlimit(int resource, struct rlimit *rlim)
         rlim->rlim_max = 2*1024*1024;
         return 0;
     case RLIMIT_NOFILE:
-        rlim->rlim_cur = FDS;
-        rlim->rlim_max = FDS;
+        // we .. .dont really have one?
+        rlim->rlim_cur = 65536;
+        rlim->rlim_max = 65536;
         return 0;
     }
     return -1;

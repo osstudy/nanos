@@ -87,10 +87,14 @@ static void *mmap(void *target, u64 size, int prot, int flags, int fd, u64 offse
 
     // backing file case. xxx - this should be demand paged and set
     // up to handle writes
-    file f = current->p->files[fd];
+    // resolve_fd but with a void * return
+    file f;
+    if (!(f = vector_get(current->p->files, fd)))
+        return(pointer_from_u64(-EBADF));            
     u64 backing = allocate_u64(p->physical, size);
     // check fail!
     // truncate and page pad the read?
+
     // mutal misalignment?...discontiguous backing?
     map(where, backing, size, p->pages);
 
