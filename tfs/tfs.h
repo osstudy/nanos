@@ -16,7 +16,8 @@ void filesystem_write(tuple_handler t, buffer b, u64 offset, status_handler comp
 void flush(value, status_handler s);
 
 // synch get
-static inline u64 file_length(tuple t)
+static inline u64 file_length(fsfile f)
 {
-    return(u64_from_value(table_find((table)t, sym(length))));
+    //    return(u64_from_value(table_find((table)t, sym(length))));
+    return 0;
 }

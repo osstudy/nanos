@@ -20,7 +20,7 @@ typedef struct tuple_handler {
 
 // h is for the bodies, the space for symbols and tuples are both implicit
 typedef closure_type(decode_allocate, value, value, symbol);
-value decode_value(heap h, tuple dictionary, buffer source, decode_allocate);
+value decode_value(heap h, tuple dictionary, buffer source);
 void encode_eav(buffer dest, table dictionary, tuple e, symbol a, value v);
 
 // seriously reconsider types allowed in tuples.. in particular simple

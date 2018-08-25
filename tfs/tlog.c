@@ -63,8 +63,8 @@ void log_set(log tl, tuple t, symbol n, value v, status_handler complete)
 }
 
 
-CLOSURE_4_1(log_read_complete, void, log, table, decode_allocate, value_handler, status);
-void log_read_complete(log tl, table read_dictionary, decode_allocate d, value_handler sh, status s)
+CLOSURE_3_1(log_read_complete, void, log, table, status_handler, status);
+void log_read_complete(log tl, table read_dictionary, status_handler sh, status s)
 {
     buffer b = tl->staging;
     u8 frame = 0;
@@ -72,25 +72,23 @@ void log_read_complete(log tl, table read_dictionary, decode_allocate d, value_h
     if (s == 0) {
         // log extension - length at the beginnin and pointer at the end
         for (; frame = pop_u8(b), frame == TUPLE_AVAILABLE;) {
-            tuple t = decode_value(tl->h, tl->dictionary, b, d);
+            tuple t = decode_value(tl->h, tl->dictionary, b);
         }
     }
-    
+    if (frame != END_OF_LOG) halt("bad log tag %p\n", frame);    
     apply(sh, 0);
-    // something really strange is going on with the value of frame
-    //    if (frame != END_OF_LOG) halt("bad log tag %p\n", frame);    
 }
 
-void read_log(log tl, u64 offset, u64 size, decode_allocate d, table read_dictionary,
-              value_handler sh)
+void read_log(log tl, u64 offset, u64 size, table read_dictionary, status_handler sh)
 {
     tl->staging = allocate_buffer(tl->h, size);
+    // should be actually read...empty log case makes this special
     //    tl->staging->end = size;
-    status_handler tlc = closure(tl->h, log_read_complete, tl, read_dictionary, d, sh);
+    status_handler tlc = closure(tl->h, log_read_complete, tl, read_dictionary, sh);
     apply(tl->fs->r, tl->staging->contents, tl->staging->length, 0, tlc);
 }
 
-log log_create(heap h, filesystem fs, decode_allocate d, value_handler vh)
+log log_create(heap h, filesystem fs, status_handler vh)
 {
     log tl = allocate(h, sizeof(struct log));
     tl->h = h;
@@ -99,6 +97,6 @@ log log_create(heap h, filesystem fs, decode_allocate d, value_handler vh)
     tl->completions = allocate_vector(h, 10);
     tl->dictionary = allocate_table(h, identity_key, pointer_equal);
     fs->tl = tl;
-    read_log(tl, 0, INITIAL_LOG_SIZE, d, allocate_table(h, identity_key, pointer_equal), vh);
+    read_log(tl, 0, INITIAL_LOG_SIZE, allocate_table(h, identity_key, pointer_equal), vh);
     return tl;
 }

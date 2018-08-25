@@ -86,6 +86,7 @@ static void defer_write(tuple f, tuple body)
     // tfs write file should take a reader
     buffer dest = allocate_buffer(transient, 10);
     read_file(dest, path);
+    rprintf ("write\n");
     set(f, sym(contents), dest, ignore_status);
     flush(f, ignore_status);
 }
@@ -113,6 +114,7 @@ static void fsc(heap h, descriptor out, value root)
 {
     // root could be an error
     vector worklist = allocate_vector(h, 10);
+    rprintf("root %v\n", root);
     iterate(root, closure(h, translate_each, h, worklist, root));    
     while (vector_length(worklist))
         apply((thunk)vector_pop(worklist));

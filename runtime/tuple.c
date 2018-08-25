@@ -85,7 +85,8 @@ static void push_header(buffer b, boolean imm, u8 type, u64 length)
 }
 
 // h is for buffer values
-value decode_value(heap h, tuple dictionary, buffer source, decode_allocate d)
+// decode directly into dest to avoid merge?
+value decode_value(heap h, tuple dictionary, buffer source)
 {
     u8 type;
     boolean imm;
@@ -117,7 +118,7 @@ value decode_value(heap h, tuple dictionary, buffer source, decode_allocate d)
                 s = table_find(dictionary, pointer_from_u64(nlen));
                 if (!s) rprintf("missing decode dictionary symbol %d\n", nlen);                
             }
-            value nv = decode_value(h, dictionary, source, d);
+            value nv = decode_value(h, dictionary, source);
             // merge
             set(t, s, nv, ignore_status);
         }

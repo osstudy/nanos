@@ -23,7 +23,7 @@ void extent_update(fsfile f, symbol foff, tuple value);
 
 typedef struct fsfile *fsfile;
 
-log log_create(heap h, filesystem fs, decode_allocate d, value_handler sh);
+log log_create(heap h, filesystem fs, status_handler sh);
 void log_write(log tl, tuple t, thunk complete);
 void log_write_eav(log tl, tuple e, symbol a, value v, thunk complete);
 
@@ -36,7 +36,7 @@ void log_flush(log tl);
 typedef closure_type(merge, status_handler);
 typedef closure_type(buffer_status, buffer, status);
 merge allocate_merge(heap h, status_handler completion);
-tuple_handler allocate_fsfile(filesystem fs, tuple md);
+value allocate_fsfile(filesystem fs);
 void log_set(log tl, tuple t, symbol n, value v, status_handler complete);
 
 static tuple_handler thalloc(bytes size,
@@ -48,4 +48,13 @@ static tuple_handler thalloc(bytes size,
 struct fsfile {
     rtrie extents;
     filesystem fs;
+    tuple_handler children;
+    tuple_handler extentst;    
 };
+
+tuple_handler backed_alloc(fsfile f,
+                           void (*set)(fsfile f, symbol, value, status_handler),
+                           void (*get)(fsfile f, symbol, value_handler));
+
+value tree_merge(heap h, tuple sd, tuple, status_handler complete);
+
