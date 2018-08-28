@@ -64,7 +64,9 @@ value allocate_fsfile(filesystem fs)
     fsfile f = allocate(fs->h, sizeof(struct fsfile));
     f->extents = rtrie_create(fs->h);
     f->fs = fs;
-    return backed_alloc(f, file_set, file_get);
+    value v = backed_alloc(f, file_set, file_get);
+    rprintf ("allocate file %p %p\n", fs, v);
+    return v;
 }
 
 // violate the g/s/i interface to allow offset and dest, I think there is an
@@ -137,21 +139,16 @@ void filesystem_write(tuple_handler t, buffer b, u64 offset, status_handler comp
     }
 }
 
-static void directory_set(tuple_handler t, symbol s, value v, status_handler complete)
-{
-        fsfile f = (fsfile)t;
-}
-
-
 void flush(value t, status_handler s)
 {
     fsfile f = (fsfile)t;
     log_flush(f->fs->tl);
 }
 
-static CLOSURE_1_1(log_complete, void, filesystem, status);
-static void log_complete(filesystem fs, status s)
+static CLOSURE_2_1(log_complete, void, value_handler, filesystem, status);
+static void log_complete(value_handler vh, filesystem fs, status s)
 {
+    apply(vh, s?s:fs->root);
 }
 
 void create_filesystem(heap h,
@@ -165,12 +162,12 @@ void create_filesystem(heap h,
     fs->r = read;
     fs->h = h;
     fs->w = write;
-    //    fs->root = backed_alloc();
+    fs->root = allocate_fsfile(fs);
     fs->alignment = alignment;
     fs->free = rtrie_create(h);
     rtrie_insert(fs->free, 0, size, (void *)true); 
     rtrie_remove(fs->free, 0, INITIAL_LOG_SIZE);
     fs->storage = rtrie_allocator(h, fs->free);
-    fs->tl = log_create(h, fs, closure(h, log_complete, fs));
+    fs->tl = log_create(h, fs, closure(h, log_complete, complete, fs));
 }
 

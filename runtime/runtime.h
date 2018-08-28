@@ -209,4 +209,5 @@ extern heap transient;
 #include <list.h>
 typedef closure_type(merge, status_handler);
 merge allocate_merge(heap h, status_handler completion);
+value tree_merge(heap h, tuple sd, tuple s, status_handler complete);
 

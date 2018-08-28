@@ -43,8 +43,6 @@ typedef struct process {
     heap h, pages, physical;
     int pid;
     tuple root;
-    // xxx - filesystem should be folded underneath tuple operators
-    filesystem fs;
     // i guess this should also be a heap, brk is so nasty
     void *brk;
     heap virtual;

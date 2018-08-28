@@ -59,6 +59,7 @@ void init_runtime(heap h)
     register_format('P', format_u64);    // for 32 bit
     register_format('d', format_number);
     register_format('b', format_buffer);
+    
     // fix
 #ifndef BITS32    
     initialize_timers(h);

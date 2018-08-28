@@ -26,9 +26,6 @@ web: web.o http.o socket_user.o $(UNIXRUNTIME)
 webs: web.o http.o socket_user.o  $(UNIXRUNTIME)
 	$(CC) $^ -static -g -o webs
 
-webs: web.c
-	cc web.c -g -static -o webs
-
 webg: webg.go
 	$(GO) build webg.go
 

@@ -85,7 +85,14 @@ static void format_cstring(buffer dest, buffer fmt, vlist *a)
     char *c = varg(*a, char *);
     if (!c) c = (char *)"(null)";
     int len = runtime_strlen(c);
-    buffer_write(dest, c, len);    
+    buffer_write(dest, c, len);
+}
+
+static void format_symbol(buffer dest, buffer fmt, vlist *a)
+{
+    symbol s = varg(*a, symbol);
+    buffer sn = symbol_string(s);
+    buffer_write(dest, buffer_ref(sn, 0), buffer_length(sn));
 }
 
 static void format_hex_buffer(buffer dest, buffer fmt, vlist *a)
@@ -100,6 +107,7 @@ void init_extra_prints()
     register_format('t', format_tuple);
     register_format('v', format_value);
     register_format('s', format_cstring);
-    register_format('X', format_hex_buffer);    
+    register_format('X', format_hex_buffer);
+    register_format('S', format_symbol);    
 }
 

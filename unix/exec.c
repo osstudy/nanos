@@ -85,7 +85,7 @@ void load_interp_complete(thread t, heap virtual, heap pages, heap physical, val
 
 // thats...alot of heaps
 process exec_elf(buffer ex,
-                 tuple md,
+                 tuple md, // put root in md
                  tuple root,
                  heap general,
                  heap physical,
@@ -94,7 +94,7 @@ process exec_elf(buffer ex,
                  heap backed)
 {
     // is process md always root?
-    process proc = create_process(general, pages, physical, md, fd);
+    process proc = create_process(general, pages, physical, md);
     thread t = create_thread(proc);
     void *start = load_elf(ex, 0, pages, physical);
     u64 va;

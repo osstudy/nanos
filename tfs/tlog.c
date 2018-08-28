@@ -45,6 +45,7 @@ void log_flush(log tl)
 
     buffer_clear(tl->completions);
     push_u8(b, END_OF_LOG);
+    rprintf ("flush log %d\n", buffer_length(tl->staging));
     apply(tl->fs->w,
           b,
           tl->offset + b->start, 
@@ -63,20 +64,27 @@ void log_set(log tl, tuple t, symbol n, value v, status_handler complete)
 }
 
 
+// xxx - distinguish between read failure and other more fatal errors
+// its actually hard to figure out if there is already a valid log here
+// on a real drive - use some statistical (signature) scheme. actually
+// more strongly I shouldn't just beleive any random drive that gets plugged
+// in to me
+
 CLOSURE_3_1(log_read_complete, void, log, table, status_handler, status);
 void log_read_complete(log tl, table read_dictionary, status_handler sh, status s)
 {
     buffer b = tl->staging;
     u8 frame = 0;
 
+    rprintf ("read log complete: %p\n", s);
     if (s == 0) {
         // log extension - length at the beginnin and pointer at the end
         for (; frame = pop_u8(b), frame == TUPLE_AVAILABLE;) {
             tuple t = decode_value(tl->h, tl->dictionary, b);
         }
+        if (frame != END_OF_LOG) halt("bad log tag %p\n", frame);    
     }
-    if (frame != END_OF_LOG) halt("bad log tag %p\n", frame);    
-    apply(sh, 0);
+    apply(sh, 0);        
 }
 
 void read_log(log tl, u64 offset, u64 size, table read_dictionary, status_handler sh)

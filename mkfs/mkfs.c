@@ -95,6 +95,9 @@ static CLOSURE_3_2(translate_each, void, heap, vector, tuple, symbol, value);
 static void translate_each(heap h, vector worklist, tuple parent, symbol k, value v)
 {
     buffer b;
+
+    // tree merge
+    rprintf ("translate: %S %p %p %v\n", k, v, parent, v);
     if (k == sym(contents)) {
         vector_push(worklist, closure(h, defer_write,parent, v));
     } else {
@@ -110,12 +113,13 @@ extern heap init_process_runtime();
 #include <stdio.h>
 
 static CLOSURE_2_1(fsc, void, heap, descriptor, value);
-static void fsc(heap h, descriptor out, value root)
+static void fsc(heap h, descriptor out, value fsroot)
 {
+    rprintf("filesystem start complete\n");
     // root could be an error
     vector worklist = allocate_vector(h, 10);
-    rprintf("root %v\n", root);
-    iterate(root, closure(h, translate_each, h, worklist, root));    
+    rprintf("root:\n%v\n%v\n", root, fsroot);
+    iterate(root, closure(h, translate_each, h, worklist, root));
     while (vector_length(worklist))
         apply((thunk)vector_pop(worklist));
     close(out);
@@ -132,6 +136,7 @@ int main(int argc, char **argv)
     parser p = tuple_parser(h, closure(h, finish, h), closure(h, perr));
     // this can be streaming
     parser_feed (p, read_stdin(h));
+    rprintf ("parse manifest: %v\n", root);
     // fixing the size doesn't make sense in this context?
     // filesystem root? no union today
     create_filesystem(h,
