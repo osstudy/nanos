@@ -1,13 +1,15 @@
-void init_unix(heap, heap, heap, tuple);
+typedef struct kernel *kernel;
 typedef struct process *process;
 typedef struct thread *thread;
-process create_process(heap h, heap pages, heap physical, tuple root);
+
+kernel init_unix(heap h,
+		 heap pages,
+		 heap physical,
+		 heap virtual,
+		 heap virtual_pagesized,
+		 heap backed,
+		 tuple root);
+
+process create_process(kernel k);
 thread create_thread(process p);
-process exec_elf(buffer ex,
-                 tuple md,
-                 tuple root,
-                 heap general,
-                 heap physical,
-                 heap pages,
-                 heap virtual,
-                 heap backed);
+process exec_elf(buffer ex, tuple root, kernel k);

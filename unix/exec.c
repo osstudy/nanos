@@ -64,7 +64,7 @@ void start_process(thread t, void *start)
 #if NET && GDB
     if (table_find(t->p->root, sym(gdb))) {
         console ("starting gdb\n");
-        init_tcp_gdb(t->p->h, t->p, 1234);
+        init_tcp_gdb(t->p->k->general, t->p, 1234);
     } else
 #endif
     {
@@ -74,29 +74,22 @@ void start_process(thread t, void *start)
 }
 
 
-CLOSURE_4_1(load_interp_complete, void, thread, heap, heap, heap, value);
-void load_interp_complete(thread t, heap virtual, heap pages, heap physical, value v)
+CLOSURE_1_1(load_interp_complete, void, thread, value);
+void load_interp_complete(thread t, value v)
 {
-    u64 where = allocate_u64(virtual, HUGE_PAGESIZE);
-    rprintf("interp: %p\n", where);
-    start_process(t, load_elf((buffer)v, where, pages, physical));
+    buffer b = v;
+    kernel k = t->p->h;
+    u64 where = allocate_u64(k->virtual, HUGE_PAGESIZE);
+    start_process(t, load_elf(b, where, k->pages, k->physical));
 }
 
-
-// thats...alot of heaps
-process exec_elf(buffer ex,
-                 tuple md, // put root in md
-                 tuple root,
-                 heap general,
-                 heap physical,
-                 heap pages,
-                 heap virtual,
-                 heap backed)
+process exec_elf(buffer ex, tuple root, kernel k)
 {
     // is process md always root?
-    process proc = create_process(general, pages, physical, md);
+    // set cwd
+    process proc = create_process(k);
     thread t = create_thread(proc);
-    void *start = load_elf(ex, 0, pages, physical);
+    void *start = load_elf(ex, 0, k->pages, k->physical);
     u64 va;
     boolean interp = false;
     Elf64_Ehdr *e = (Elf64_Ehdr *)buffer_ref(ex, 0);
@@ -111,19 +104,20 @@ process exec_elf(buffer ex,
             va = p->p_vaddr;
         proc->brk  = pointer_from_u64(MAX(u64_from_pointer(proc->brk), pad(p->p_vaddr + p->p_memsz, PAGESIZE)));
     }
-    build_exec_stack(backed, t, e, start, va, md);
+    build_exec_stack(k->backed, t, e, start, va, root);
             
     foreach_phdr(e, p) {
         if (p->p_type == PT_INTERP) {
             char *n = (void *)e + p->p_offset;
-            tuple interp = resolve_path(root, split(general, alloca_wrap_buffer(n, runtime_strlen(n)), '/'));
+            tuple interp = resolve_path(k->root, split(k->general, alloca_wrap_buffer(n, runtime_strlen(n)), '/'));
             if (!interp) 
                 halt("couldn't find program interpreter %s\n", n);
-            get(interp, sym(contents), closure(general, load_interp_complete, t, virtual, pages, physical));
+            get(interp, sym(contents), closure(proc->h, load_interp_complete, t));
             return proc;
         }
     }
     start_process(t, start);
+    add_elf_syms(k->general, ex);
     return proc;    
 }
 

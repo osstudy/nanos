@@ -6,20 +6,23 @@
 #include <gdb.h>
 #include <net.h>
 
+// conditionalize
+// fix config/build, remove this include to take off network
+#include <net.h>
+
 typedef struct process *process;
 typedef struct thread *thread;
 
-process create_process(heap h, heap pages, heap contig, tuple root);
 thread create_thread(process);
-void run(thread);
 
+void run(thread);
 
 typedef struct thread {
     // if we use an array typedef its fragile
     // there are likley assumptions that frame sits at the base of thread
     u64 frame[FRAME_MAX];
     process p;
-
+    status_handler status_wakeup;
     void *set_child_tid;
     void *clear_child_tid;
     u64 tid;
@@ -34,15 +37,38 @@ typedef struct file {
     u64 offset; 
     io read, write;
     // check if data on the read path
-    closure_type(check, void, thunk);
+    closure_type(check, void, thunk in, thunk hup);
     closure_type(close, int);
     tuple n;
 } *file;
 
-typedef struct process {
-    heap h, pages, physical;
-    int pid;
+/* kernel "instance", really just a collection of allocators, fs root, etc. */
+typedef struct kernel {
+    /* memory heaps */
+    heap general;
+    heap pages;
+    heap physical;
+    heap virtual;		/* these are for kernel-only mappings; */
+    heap virtual_pagesized;	/* not user space */
+    heap backed;
+
+    /* object caches */
+    heap file_cache;
+    heap epoll_cache;
+    heap epollfd_cache;
+    heap epoll_blocked_cache;
+#ifdef NET
+    heap socket_cache;
+#endif
+    /* id heaps */
+    heap processes;
     tuple root;
+} *kernel;
+
+typedef struct process {
+    kernel k;
+    heap h; // reestablish this just to scope process control allocations
+    int pid;
     // i guess this should also be a heap, brk is so nasty
     void *brk;
     heap virtual;
@@ -55,11 +81,14 @@ typedef struct process {
     u64 sigmask;
     void **syscall_handlers;
     vector files;
+    tuple root;
 } *process;
 
-file allocate_fd(process p, bytes size, int *);
+extern thread current;
 
-thread current;
+u64 allocate_fd(process p, file f);
+
+void deallocate_fd(process p, int fd, file f);
 
 void init_vdso(heap, heap);
 
@@ -92,6 +121,8 @@ void register_mmap_syscalls(void **);
 void register_thread_syscalls(void **);
 void register_poll_syscalls(void **);
 
+boolean poll_init(kernel k);
+
 extern u64 syscall_ignore();
 CLOSURE_1_1(default_fault_handler, void, thread, context);
 void default_fault_handler(thread t, context frame);
@@ -107,3 +138,4 @@ static inline void set_syscall_return(thread t, u64 val)
 
 #define resolve_fd(__p, __fd) ({void *f ; if (!(f = vector_get(__p->files, __fd))) return(-EBADF); f;})
 
+char *syscall_name(int x);

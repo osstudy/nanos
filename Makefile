@@ -16,6 +16,9 @@ net/lwip:
 test: force
 	cd test ; make
 
+unit-test: test
+	cd test ; make unit-test
+
 distclean: clean
 	rm -rf net/lwip
 
