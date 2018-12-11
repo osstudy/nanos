@@ -1427,6 +1427,24 @@ static void syscall_debug()
     }
     set_syscall_return(current, res);
     current->syscall = -1;
+
+    /* Check the runqueue and possibly service another thread after
+       throwing current at the end of the queue.
+
+       If the syscall decided to call thread_sleep(), we wouldn't get
+       to this point anyway - so this check is only for syscalls that
+       immediately return.
+
+       XXX: There could be a race here for SMP where something can get
+       dequeued from the runqueue after we call queue_peek(). Hardly
+       the biggest concern when moving to SMP, but worth noting. So it
+       may pay to figure out how to make this effectively an atomic
+       operation on the runqueue.
+     */
+    if (queue_peek(runqueue)) {
+        thread_wakeup(current);
+        thread_sleep(current);
+    }
 }
 
 boolean syscall_notrace(int syscall)
