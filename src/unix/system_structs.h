@@ -329,8 +329,8 @@ typedef struct siginfo {
             u64 call_addr;
             s32 syscall;
             u32 arch;
-        } _sigsys;
-    } _sifields;
+        } sigsys;
+    } sifields;
 } __attribute__((aligned(8))) siginfo_t;
 
 #define SI_USER     0
@@ -422,6 +422,10 @@ struct sigaction {
 
 #define SA_NOMASK  SA_NODEFER
 #define SA_ONESHOT SA_RESETHAND
+
+#define SIG_BLOCK   0
+#define SIG_UNBLOCK 1
+#define SIG_SETMASK 2
 
 typedef struct {
     void *ss_sp;
