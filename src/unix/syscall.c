@@ -283,6 +283,45 @@ static inline tuple resolve_cstring(tuple cwd, const char *f)
     return t;
 }
 
+static inline tuple resolve_utf8(tuple cwd, const char *f)
+{
+    tuple t = *f == '/' ? filesystem_getroot(current->p->fs) : cwd;
+
+    buffer a = little_stack_buffer(3 * NAME_MAX);
+    char y;
+    int nbytes;
+
+    if (buffer_length(a)) {
+        t = lookup(t, intern(a));
+    }
+
+    while ((y = *f))
+    {
+        if (y == '/') {
+            if (buffer_length(a)) {
+                t = lookup(t, intern(a));
+                if (!t)
+                    return t;
+                buffer_clear(a);
+            }
+            f++;
+        } else {
+            nbytes = push_utf8_character(a, f);
+            if (!nbytes) {
+                thread_log(current, "Invalid UTF-8 sequence.\n");
+                return 0;
+            }
+            f += nbytes;
+        }
+    }
+
+    if (buffer_length(a)) {
+        t = lookup(t, intern(a));
+    }
+
+    return t;
+}
+
 static inline tuple resolve_cstring_parent(tuple cwd, const char *f)
 {
     tuple t = (*f == '/' ? filesystem_getroot(current->p->fs) : cwd);
@@ -751,7 +790,7 @@ sysreturn open_internal(tuple cwd, const char *name, int flags, int mode)
 {
     heap h = heap_general(get_kernel_heaps());
     unix_heaps uh = get_unix_heaps();
-    tuple n = resolve_cstring(cwd, name);
+    tuple n = resolve_utf8(cwd, name);
 
     if ((flags & O_CREAT)) {
         if (n && (flags & O_EXCL)) {
@@ -764,7 +803,7 @@ sysreturn open_internal(tuple cwd, const char *name, int flags, int mode)
 
             /* XXX We could rearrange calls to return tuple instead of
                status; though this serves as a sanity check. */
-            n = resolve_cstring(cwd, name);
+            n = resolve_utf8(cwd, name);
         }
     }
 
