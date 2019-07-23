@@ -48,7 +48,21 @@ sysreturn times(struct tms *buf)
 sysreturn clock_gettime(clockid_t clk_id, struct timespec *tp)
 {
     thread_log(current, "clock_gettime: clk_id %d", clk_id);
-    timespec_from_time(tp, now());
+    timestamp t;
+    switch (clk_id) {
+    case CLOCK_REALTIME:
+    case CLOCK_REALTIME_COARSE:
+        t = now();
+        break;
+    case CLOCK_MONOTONIC:
+    case CLOCK_MONOTONIC_COARSE:
+    case CLOCK_MONOTONIC_RAW:
+        t = uptime();
+        break;
+    default:
+        return -EINVAL;
+    }
+    timespec_from_time(tp, t);
     return 0;
 }
 
